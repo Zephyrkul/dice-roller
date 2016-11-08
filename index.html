@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang=en>
+
+<head>
+    <meta charset=utf-8>
+    <meta name=author content="Eryk De Marco">
+    <title>Dice Roller</title>
+    <style type=text/css>
+        body {
+            font-size: 18px;
+            text-align: center
+        }
+        
+        #loading {
+            background: rgba(0, 0, 0, 0.25);
+            background-image: url(roll.gif);
+            background-repeat: no-repeat;
+            background-position: 50% 50%;
+            width: 100%;
+            height: 100%;
+            cursor: wait;
+            position: fixed;
+            top: 0;
+            left: 0
+        }
+        
+        #form {
+            font-family: "Lucida Console", Monaco, monospace;
+            vertical-align: middle;
+            width: 100%;
+            position: fixed;
+            top: 21px;
+            left: 0
+        }
+        
+        #check {
+            padding: 0;
+            position: absolute;
+            top: 8px;
+            left: 50px
+        }
+        
+        #dice {
+            border: 1px solid black;
+            border-radius: 1000px;
+            font: inherit;
+            margin-right: 2px;
+            padding: 9px 19px 9px 39px;
+            width: 80%
+        }
+        
+        #dice:focus {
+            outline: 0;
+            border: 2px solid cyan;
+            padding: 8px 18px 8px 38px
+        }
+        
+        #roll {
+            background-color: green;
+            border: 1px solid black;
+            border-radius: 1000px;
+            color: white;
+            cursor: pointer;
+            font: inherit;
+            margin-left: 2px;
+            padding: 9px 19px;
+            width: 10%
+        }
+        
+        #roll:focus {
+            border: 2px solid cyan;
+            outline: 0;
+            padding: 8px 18px
+        }
+        
+        #roll:hover {
+            background-color: #CFC;
+            color: black
+        }
+        
+        .css-checkbox {
+            position: absolute;
+            z-index: -1000;
+            left: -1000px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            height: 1px;
+            width: 1px;
+            margin: -1px;
+            padding: 0;
+            border: 0
+        }
+        
+        .css-checkbox+.css-label,
+        .css-checkbox+.css-label.clr {
+            padding-left: 20px;
+            height: 20px;
+            display: inline-block;
+            line-height: 20px;
+            background-repeat: no-repeat;
+            background-position: 0 0;
+            font-size: 20px;
+            vertical-align: middle
+        }
+        
+        .css-checkbox:checked+.css-label,
+        .css-checkbox+.css-label.chk {
+            background-position: 0 -20px
+        }
+        
+        .css-label {
+            background-image: url(die.png);
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            cursor: pointer
+        }
+        
+        #break {
+            background-image: url('dice.png');
+            background-position: 50% 50%;
+            background-repeat: x-repeat;
+            border: 4px double black;
+            border-radius: 1000px;
+            height: 36px
+        }
+        
+        #results {
+            border-collapse: collapse;
+            font-family: "Courier New", Courier, monospace;
+            margin: 0;
+            width: 100%
+        }
+        
+        #results th {
+            background-color: #090;
+            color: white;
+            font-weight: bold;
+            padding: 10px
+        }
+        
+        #results th:not(:last-child) {
+            border-right: 2px solid white
+        }
+        
+        #results td {
+            padding: 10px
+        }
+        
+        .result {
+            -webkit-transition: .25s;
+            transition: .25s
+        }
+        
+        .result:not(:last-child) {
+            border-bottom: 2px solid grey
+        }
+        
+        .result:nth-last-child(even) {
+            background-color: #EEE
+        }
+        
+        .result:hover {
+            background-color: #CFC
+        }
+        
+        .result td:not(:last-child) {
+            width: 20%;
+            border-right: 4px double grey
+        }
+		
+		.diceres {
+			border: 0;
+			padding: 0;
+			margin: 0;
+			height: 20px;
+			overflow-x: hidden;
+			overflow-y: auto;
+		}
+        
+        .error {
+            background-color: yellow;
+            border-top: 1px solid white;
+            font-weight: bold
+        }
+        
+        .high {
+            font-weight: bold
+        }
+        
+        .one {
+            color: red;
+            font-style: italic
+        }
+        
+        #foot {
+            color: grey;
+            text-align: right;
+            font-size: 12px;
+            padding: 10px;
+            position: fixed;
+            bottom: 0;
+            right: 0
+        }
+    </style>
+    <script src=jquery.js></script>
+    <script src=jspatch.js></script>
+    <script type=text/javascript>
+        'use strict';
+        void function() {
+			var diceUtil = {
+				init: function() {
+					diceUtil.cache = new diceUtil.cacheProto();
+					diceUtil.get('#loading').detach();
+				},
+				cacheProto: function() {
+					var collection = {};
+
+					function getCache(selector) {
+						return collection[selector] === undefined ? (collection[selector] = $(selector)) : collection[selector];
+					};
+					return {
+						get: getCache
+					};
+				},
+				get: function(selector) {
+					return diceUtil.cache.get(selector);
+				},
+				disable: function() {
+					diceUtil.get('body').append(diceUtil.get('#loading'));
+					diceUtil.timeout = false;
+					diceUtil.focus = diceUtil.get('#dice').is(':focus');
+					diceUtil.get('#dice, #roll, #ex').prop('disabled', true).blur();
+				},
+				enable: function() {
+					diceUtil.get('#loading').detach();
+					diceUtil.get('#dice, #roll, #ex').prop('disabled', false);
+					(diceUtil.focus ? diceUtil.get('#dice') : diceUtil.get('#roll')).focus();
+				},
+				random: function(n) {
+					window.crypto.getRandomValues(diceUtil.buffer);
+					if (diceUtil.buffer[0] >= 1073741824 - 1073741824 % n)
+						return random(n);
+					return diceUtil.buffer[0] * (n / 1073741824);
+				},
+				buffer: new Uint32Array(1),
+				cache: undefined,
+				focus: true,
+				timeout: false
+			};
+			var diceEvent = {
+				onReady: function() {
+					diceUtil.init();
+					diceUtil.get('#ex').change(diceEvent.onChange);
+					diceUtil.get('#dice').keyup(diceEvent.onKeyUp);
+					diceUtil.get('#roll').click(diceEvent.onClick);
+				},
+				onChange: function() {
+					diceUtil.get('#dice').focus();
+				},
+				onKeyUp: function(event) {
+					if (event.keyCode == 13)
+						diceUtil.get('#roll').click();
+				},
+				onClick: function() {
+					diceUtil.disable();
+					var promise = diceUtil.get('html, body').stop(true).animate({
+						scrollTop: 0
+					}).delay(100).promise();
+					var dice = diceUtil.get('#dice').val().replace(/\s+/g, '').replace(/--/g, '+').replace(/-/g, '+-').replace(/\+{2,}/g, '+').toLowerCase().replace(/\+1d/g, '+d').replace(/-1d/g, '-d');
+					$('.error').remove();
+					if (dice.length === 0 || dice.indexOf('d') === -1) {
+						promise.done(function() {
+							diceUtil.get('#tbody').prepend('<tr class=error><td>Error</td><td>' + dice.replace(/\+-/g, ' - ').replace(/\+/g, ' + ').trim() + '</td><td></td><td>No dice</td></tr>');
+							diceUtil.enable();
+						});
+						return;
+					}
+					if (/[^d\d\+-]|d\d+d|d\D|d$|^\+|^-|\+$|-$/.test(dice)) {
+						promise.done(function() {
+							diceUtil.get('#tbody').prepend('<tr class=error><td>Error</td><td>' + dice.replace(/\+-/g, ' - ').replace(/\+/g, ' + ').trim() + '</td><td></td><td>Dice syntax</td></tr>');
+							diceUtil.enable();
+						});
+						return;
+					}
+					var textarr = dice.split(/\+/);
+					var vals = [];
+					var protoSum = 0;
+					var diceNum = 0;
+					var err = false;
+					$.each(textarr, function(index, value) {
+						if (err)
+							return;
+						if (value.indexOf('d') > -1) {
+							var d = value.split('d');
+							if (d[1] < 2 || d[1] > 32768) {
+								promise.then(function() {
+									diceUtil.get('#tbody').prepend('<tr class=error><td>Error</td><td>' + dice.replace(/\+-/g, ' - ').replace(/\+/g, ' + ').trim() + '</td><td></td><td>Invalid dice</td></tr>');
+									diceUtil.enable();
+								});
+								err = true;
+								return;
+							}
+							if (d[0].length === 0)
+								d[0] = '1';
+							else if (d[0] === '-')
+								d[0] = '-1';
+							for (var i = 0; i < Math.abs(d[0]); i++) {
+								if (promise.state() !== 'pending') {
+									diceUtil.get('#tbody').prepend('<tr class=error><td>Error</td><td>' + dice.replace(/\+-/g, ' - ').replace(/\+/g, ' + ') + '</td><td></td><td>Dice timed out</td></tr>');
+									diceUtil.enable();
+									err = true;
+									return;
+								}
+								if (diceUtil.get('#ex').is(':checked')) {
+									var sum = 0;
+									while (true) {
+										var val = 1 + Math.floor(diceUtil.random(d[1]));
+										sum += Math.sign(d[0]) * val;
+										if (val < Math.abs(d[1]))
+											break;
+									}
+								}
+								var res = sum || Math.sign(d[0]) * (1 + Math.floor(diceUtil.random(d[1])));
+								if (Math.abs(res) >= d[1])
+									res = '<span class=high>' + res + '</span>';
+								vals.push(res.toString());
+							}
+						} else
+							protoSum += parseInt(value);
+					});
+					if (err)
+						return;
+					promise.then(function() {
+						diceUtil.get('#tbody').prepend('<tr class=result><td>' + (parseInt(($('.result').length || 0)) + 1) + '</td><td>' + dice.replace(/\+-/g, ' - ').replace(/\+/g, ' + ') + '</td><td>' + (protoSum + vals.reduce((acc, cur) => acc + parseInt(cur.toString().replace(/<[^>]*>/g, '')), 0)) + '</td><td><div class=diceres>' + vals.reduce((acc, cur) => acc + ', ' + cur.toString().replace(/-/g, '').replace(/^1$/, '<span class=one>1</span>'), '').substring(2) + '</div></td></tr>');
+						diceUtil.enable();
+					});
+				},
+				onPromise: function() {
+					diceUtil.timeout = true;
+				}
+			};
+			$(diceEvent.onReady);
+		}();
+    </script>
+</head>
+
+<body>
+    <div id=loading>&nbsp;</div>
+    <div id=form>
+        <input type=text id=dice placeholder=Dice... autofocus><button type=button id=roll>Roll</button>
+        <div id=check>
+            <input type=checkbox id=ex class=css-checkbox><label for=ex class=css-label>&nbsp;</label>
+        </div>
+    </div>
+    <p id=break>&nbsp;</p>
+    <hr>
+    <table id=results>
+        <thead>
+            <tr id=header>
+                <th>Roll</th>
+                <th>Input</th>
+                <th>Total</th>
+                <th>Dice</th>
+            </tr>
+        </thead>
+        <tbody id=tbody></tbody>
+    </table>
+    <div id=foot>&copy; Eryk De Marco 2016</div>
+</body>
+
+</html>
